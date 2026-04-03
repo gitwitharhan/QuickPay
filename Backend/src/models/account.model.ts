@@ -1,5 +1,6 @@
 import mongoose, { Document, Model } from "mongoose";
-
+import Transaction from "./transaction.model";
+import Ledger from "./ledger.model";
 /**
  * Interface (Document type)
  */
@@ -9,6 +10,7 @@ export interface IAccount extends Document {
   currency: string;
   createdAt: Date;
   updatedAt: Date;
+  getBalance(): Promise<number>;
 }
 
 /**
@@ -42,6 +44,42 @@ const accountSchema = new mongoose.Schema<IAccount>(
  * Compound unique index (1 user = 1 account per status)
  */
 accountSchema.index({ user: 1, status: 1 }, { unique: true });
+
+
+accountSchema.methods.getBalance = async function (): Promise<number> {
+    const balanceResult = await Ledger.aggregate([
+        { $match: { account: this._id } },
+        {
+            $group: {
+                _id: null,
+                totalDebits: {
+                    $sum: {
+                        $cond: [{ $eq: ["$type", "debit"] }, "$amount", 0]
+                    }
+                },
+                totalCredits: {
+                    $sum: {
+                        $cond: [{ $eq: ["$type", "credit"] }, "$amount", 0]
+                    }
+                }
+            }
+        },
+        {
+            $project: {
+                _id: 0,
+                balance: { $subtract: ["$totalCredits", "$totalDebits"] }
+            }
+        }
+    ]);
+
+    if (balanceResult.length === 0) {
+        return 0;
+    }
+    
+    return balanceResult[0].balance;
+};
+        
+    
 
 /**
  * Model
