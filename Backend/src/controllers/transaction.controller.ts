@@ -7,6 +7,7 @@ import mongoose from "mongoose";
  * the 10-step transaction flow
  */
 export const createTransaction = async (req: any, res: any) => {
+  let newTransaction: ITransaction; // Declare here to be used outside the try block
   try {
     /**
      * Input validation and basic checks
@@ -52,43 +53,45 @@ export const createTransaction = async (req: any, res: any) => {
       return res.status(400).json({ message: "Insufficient funds" });
     }
      
-    /**
+   try { /**
      * Create transaction with pending status
      */
     const session = await mongoose.startSession();
     session.startTransaction();
 
     // @ts-ignore
-    const newTransaction = await Transaction.create(
+    newTransaction = await Transaction.create([
       {
         fromAccount,
         toAccount,
         amount,
         idempotencyKey,
         status: "pending",
-      },
-      { session }
-    ) as ITransaction;
+      }],
+      { session }  
+    )[0] as ITransaction;
 
     // @ts-ignore
-    const debitLedgerEntry = await Ledger.create(
+    const debitLedgerEntry = await Ledger.create([
       {
         account: fromAccount,
         amount,
         type: "debit",
         transaction: newTransaction._id,
-      },
+      }],
       { session }
     );
 
+    await (()=> new Promise(resolve => setTimeout(resolve, 1000*50)))(); // Simulate processing delay  
+
     // @ts-ignore
-    const creditLedgerEntry = await Ledger.create(
+    const creditLedgerEntry = await Ledger.create([ 
       {
         account: toAccount,
         amount,
         type: "credit",
         transaction: newTransaction._id,
-      },
+      }] ,
       { session }
     );
 
@@ -100,7 +103,10 @@ export const createTransaction = async (req: any, res: any) => {
 
     await session.commitTransaction();
     session.endSession();
-
+  } catch (error) {
+    console.error("Error during transaction processing:", error);
+    return res.status(500).json({ message: "transaction is pending pls try after sometime" });
+  }
     res.status(201).json({ message: "Transaction completed successfully", transaction: newTransaction });
   } catch (error) {
     console.error("Error processing transaction:", error);
@@ -112,6 +118,7 @@ export const createTransaction = async (req: any, res: any) => {
  * create initial transaction from system user to new users account
  */
 export const createInitialTransaction = async (req: any, res: any) => {
+  let newTransaction: ITransaction;
   try {
     const { toAccount, amount,idempotencyKey} = req.body;
 
@@ -137,37 +144,38 @@ export const createInitialTransaction = async (req: any, res: any) => {
     const session = await mongoose.startSession();
     session.startTransaction();
     
+    let newTransaction: ITransaction;
     // @ts-ignore
-    const newTransaction = await Transaction.create(
+    newTransaction = await Transaction.create([
       {
         fromAccount: systemUserAccount._id,
         toAccount,
         amount,
         idempotencyKey,
         status: "pending",
-      },
+      }],
       { session }
-    ) as ITransaction;
+    )[0] as ITransaction;
 
     // @ts-ignore
-    const debitLedgerEntry = await Ledger.create(
+    const debitLedgerEntry = await Ledger.create([
       {
         account: systemUserAccount._id,
         amount,
         type: "debit",
         transaction: newTransaction._id,
-      },
+      }],
       { session }
     );
 
     // @ts-ignore
-    const creditLedgerEntry = await Ledger.create(
+    const creditLedgerEntry = await Ledger.create([
       {
         account: toAccount,
         amount,
         type: "credit",
         transaction: newTransaction._id,
-      },
+      }],
       { session }
     );
 
