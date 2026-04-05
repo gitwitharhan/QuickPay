@@ -4,7 +4,7 @@ import * as transactionController from "../controllers/transaction.controller";
 import * as systemUserMiddleware from "../middleware/systemUserAuth.middleware";
 const trasactionRouter = express.Router();
 
-trasactionRouter.post("/", authmiddleware.authenticate, transactionController.createTransaction );
+trasactionRouter.post("/create", authmiddleware.authenticate, transactionController.createTransaction );
 
 /**
  * transaction initial amount from system user

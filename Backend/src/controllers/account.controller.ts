@@ -48,13 +48,13 @@ export const getUserAccounts = async (req: any, res: any) => {
  */
 export const getAccountDetailsById = async (req: any, res: any) => {
   try {
-    const userId = req.user._id;
-    const accountId = req.params.accountId;
-
-    const account = await Account.findOne({ _id: accountId, user: userId });
+    const rawAccId = req.params.accountId || "";
+    const accId = rawAccId.replace(/^:/, ''); 
+    const account = await Account.findById(accId);
     if (!account) {
       return res.status(404).json({ message: "Account not found" });
     }
+   
 
     const balance = await account.getBalance();
     res.status(200).json({ account, balance });

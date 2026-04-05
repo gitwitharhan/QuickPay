@@ -10,6 +10,7 @@ export interface IAccount extends Document {
   currency: string;
   createdAt: Date;
   updatedAt: Date;
+  systemAccount: boolean;
   getBalance(): Promise<number>;
 }
 
@@ -33,6 +34,11 @@ const accountSchema = new mongoose.Schema<IAccount>(
       type: String,
       required: [true, "Currency is required"],
       default: "INR",
+    },
+    systemAccount: {
+      type: Boolean,
+      default: false,
+      select: false,
     },
   },
   {

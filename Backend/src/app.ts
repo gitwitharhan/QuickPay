@@ -10,7 +10,7 @@ app.use(cookieParser());
 
 /** Routes */ 
 app.use('/api/auth', authRoutes);
-app.use('/api/accounts', accountRoutes);
-app.use('/api/transactions', transactionRoutes);
+app.use('/api/account', accountRoutes);
+app.use('/api/transaction', transactionRoutes);
  
 export default app;
