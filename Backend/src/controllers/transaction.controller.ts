@@ -3,7 +3,7 @@ import Ledger from "../models/ledger.model";
 import Account from "../models/account.model";
 import mongoose from "mongoose";
 import User from "../models/user.model";
-
+import { sendEmail } from "../config/nodemailer";
 /** 
  * the 10-step transaction flow
  */
@@ -103,7 +103,45 @@ export const createTransaction = async (req: any, res: any) => {
         { session, new: true }
       ) as ITransaction;
     });
+    try {
+      const senderUser = await User.findById(fromAcc.user);
+      const receiverUser = await User.findById(toAcc.user);
+      const amountStr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
 
+      if (receiverUser?.email) {
+        await sendEmail({
+          to: receiverUser.email,
+          subject: "Amount Credited - QuickPay",
+          html: `<div style="font-family: Arial, sans-serif; padding: 20px; color: #333; border: 1px solid #ddd; border-radius: 5px;">
+                   <h2 style="color: #28a745;">Amount Credited!</h2>
+                   <p>Hello ${receiverUser.name},</p>
+                   <p>Your account has been credited with <strong>${amountStr}</strong>.</p>
+                   <p><strong>Transaction ID:</strong> ${newTransaction._id}</p>
+                   <p><strong>From Account:</strong> ${fromAccount}</p>
+                   <br/>
+                   <p>Thank you for using QuickPay.</p>
+                 </div>`,
+        });
+      }
+
+      if (senderUser?.email) {
+        await sendEmail({
+          to: senderUser.email,
+          subject: "Amount Debited - QuickPay",
+          html: `<div style="font-family: Arial, sans-serif; padding: 20px; color: #333; border: 1px solid #ddd; border-radius: 5px;">
+                   <h2 style="color: #dc3545;">Amount Debited</h2>
+                   <p>Hello ${senderUser.name},</p>
+                   <p>Your account has been debited by <strong>${amountStr}</strong>.</p>
+                   <p><strong>Transaction ID:</strong> ${newTransaction._id}</p>
+                   <p><strong>To Account:</strong> ${toAccount}</p>
+                   <br/>
+                   <p>Thank you for using QuickPay.</p>
+                 </div>`,
+        });
+      }
+    } catch (emailError) {
+      console.error("Failed to send transaction notification emails:", emailError);
+    }
     await session.endSession();
   } catch (error) {
     console.error("Error during transaction processing:", error);
@@ -189,6 +227,30 @@ export const createInitialTransaction = async (req: any, res: any) => {
     });
 
     await session.endSession();
+
+    try {
+      const recipientAccount = await Account.findById(toAccount);
+      if (recipientAccount) {
+        const receiverUser = await User.findById(recipientAccount.user);
+        if (receiverUser?.email) {
+          const amountStr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
+          await sendEmail({
+            to: receiverUser.email,
+            subject: "Welcome Bonus Credited - QuickPay",
+            html: `<div style="font-family: Arial, sans-serif; padding: 20px; color: #333; border: 1px solid #ddd; border-radius: 5px;">
+                     <h2 style="color: #28a745;">You received a Welcome Bonus!</h2>
+                     <p>Hello ${receiverUser.name},</p>
+                     <p>Your account has been credited with an initial amount of <strong>${amountStr}</strong>.</p>
+                     <p><strong>Transaction ID:</strong> ${newTransaction._id}</p>
+                     <br/>
+                     <p>Thank you for joining QuickPay.</p>
+                   </div>`,
+          });
+        }
+      }
+    } catch (emailError) {
+      console.error("Failed to send email for initial transaction:", emailError);
+    }
 
     res.status(201).json({ message: "Initial transaction completed successfully", transaction: newTransaction });
   } catch (error) {
