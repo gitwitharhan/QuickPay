@@ -11,6 +11,7 @@ export interface ITransaction extends Document {
   idempotencyKey: string;
   createdAt: Date;
   updatedAt: Date;
+  description:string
 }
 
 /**
@@ -45,6 +46,10 @@ const transactionSchema = new mongoose.Schema<ITransaction>(
       required: [true, "Idempotency key is required"],
       unique: true,
       index: true,
+    },
+    description: {
+      type: String,
+      required: [true, "Description is required"],
     },
   },
   {

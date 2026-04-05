@@ -34,7 +34,16 @@ export const getUserAccounts = async (req: any, res: any) => {
   try {
     const userId = req.user._id;
     const accounts = await Account.find({ user: userId });
-    res.status(200).json({ accounts });
+    
+    // Attach dynamically calculated balance to each account
+    const accountsWithBalances = await Promise.all(
+      accounts.map(async (acc) => {
+        const balance = await acc.getBalance();
+        return { ...acc.toObject(), balance };
+      })
+    );
+
+    res.status(200).json({ accounts: accountsWithBalances });
   } catch (error) {
     console.error("Error fetching accounts:", error);
     res.status(500).json({ message: "Server error while fetching accounts" });

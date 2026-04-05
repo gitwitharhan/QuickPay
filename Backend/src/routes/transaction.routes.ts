@@ -10,4 +10,5 @@ trasactionRouter.post("/create", authmiddleware.authenticate, transactionControl
  * transaction initial amount from system user
  */
 trasactionRouter.post("/initial", systemUserMiddleware.authenticateSystemUser, transactionController.createInitialTransaction );
+trasactionRouter.get("/all", authmiddleware.authenticate, transactionController.getAllTransactions );
 export default trasactionRouter;

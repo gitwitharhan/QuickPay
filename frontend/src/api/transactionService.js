@@ -31,3 +31,18 @@ export const createInitialTransaction = async (payload) => {
   }
   return data;
 };
+
+export const getAllTransactions = async () => {
+  const res = await fetch('/api/transaction/all', {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    credentials: 'include'
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.message || 'Failed to fetch transactions');
+  }
+  return data;
+};

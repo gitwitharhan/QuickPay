@@ -13,9 +13,9 @@ export const createTransaction = async (req: any, res: any) => {
     /**
      * Input validation and basic checks
      */
-    const { fromAccount, toAccount, amount,idempotencyKey} = req.body;
+    const { fromAccount, toAccount, amount,idempotencyKey,description} = req.body;
 
-    if (!fromAccount || !toAccount || !amount || !idempotencyKey) {
+    if (!fromAccount || !toAccount || !amount || !idempotencyKey || !description) {
       return res.status(400).json({ message: "Missing required fields" });
     }   
 
@@ -68,6 +68,7 @@ export const createTransaction = async (req: any, res: any) => {
           amount,
           idempotencyKey,
           status: "pending",
+          description
         }],
         { session }  
       );
@@ -118,6 +119,8 @@ export const createTransaction = async (req: any, res: any) => {
                    <p>Your account has been credited with <strong>${amountStr}</strong>.</p>
                    <p><strong>Transaction ID:</strong> ${newTransaction._id}</p>
                    <p><strong>From Account:</strong> ${fromAccount}</p>
+                   <p><strong>username:</strong> ${senderUser?.name || 'Sender'}</p>
+                   <p><strong>Description:</strong> ${description}</p>
                    <br/>
                    <p>Thank you for using QuickPay.</p>
                  </div>`,
@@ -160,7 +163,7 @@ export const createTransaction = async (req: any, res: any) => {
 export const createInitialTransaction = async (req: any, res: any) => {
   let newTransaction = {} as ITransaction;
   try {
-    const { toAccount, amount,idempotencyKey} = req.body;
+    const { toAccount, amount,idempotencyKey,description} = req.body;
 
     if (!toAccount || !amount || !idempotencyKey) {
       return res.status(400).json({ message: "Missing required fields" });
@@ -197,6 +200,7 @@ export const createInitialTransaction = async (req: any, res: any) => {
           amount,
           idempotencyKey,
           status: "pending",
+          description
         }],
         { session }
       );
@@ -241,14 +245,14 @@ export const createInitialTransaction = async (req: any, res: any) => {
           const amountStr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
           await sendEmail({
             to: receiverUser.email,
-            subject: "Welcome Bonus Credited - QuickPay",
+            subject: "Cash is Deposited on your Account",
             html: `<div style="font-family: Arial, sans-serif; padding: 20px; color: #333; border: 1px solid #ddd; border-radius: 5px;">
-                     <h2 style="color: #28a745;">You received a Welcome Bonus!</h2>
+                     <h2 style="color: #28a745;">Cash is Deposited on your Account!</h2>
                      <p>Hello ${receiverUser.name},</p>
-                     <p>Your account has been credited with an initial amount of <strong>${amountStr}</strong>.</p>
+                     <p>Your account has been credited with an cash amount of <strong>${amountStr}</strong>.</p>
                      <p><strong>Transaction ID:</strong> ${newTransaction._id}</p>
                      <br/>
-                     <p>Thank you for joining QuickPay.</p>
+                     <p>Thank you for using QuickPay.</p>
                    </div>`,
           });
         }
@@ -263,3 +267,32 @@ export const createInitialTransaction = async (req: any, res: any) => {
     res.status(500).json({ message: "Server error while processing initial transaction" });
   }
 }; 
+
+export const getAllTransactions = async (req: any, res: any) => {
+  try {
+    const userAccounts = await Account.find({ user: req.user._id }).select('_id');
+    const accountIds = userAccounts.map(acc => acc._id);
+
+    // Fetch transactions where the user's account is either the sender or the receiver
+    const transactions = await Transaction.find({
+      $or: [
+        { fromAccount: { $in: accountIds } },
+        { toAccount: { $in: accountIds } }
+      ]
+    })
+    .populate({
+      path: "fromAccount",
+      populate: { path: "user", select: "name email systemUser" }
+    })
+    .populate({
+      path: "toAccount",
+      populate: { path: "user", select: "name email systemUser" }
+    })
+    .sort({ createdAt: -1 });
+
+    res.status(200).json({ transactions });
+  } catch (error) {
+    console.error("Error fetching transactions:", error);
+    res.status(500).json({ message: "Server error while fetching transactions" });
+  }
+};

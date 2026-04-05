@@ -5,7 +5,7 @@ import AbstractLogo from '../components/AbstractLogo';
 import Sidebar from '../components/Sidebar';
 import StatCard from '../components/StatCard';
 import { fetchUserAccounts, fetchAccountDetails, createAccount } from '../api/accountService';
-import { createTransaction, createInitialTransaction } from '../api/transactionService';
+import { createTransaction, createInitialTransaction, getAllTransactions } from '../api/transactionService';
 
 export default function UserDashboard() {
   const { user, logout } = useAuth();
@@ -21,8 +21,15 @@ export default function UserDashboard() {
   // Transaction form states
   const [toAccount, setToAccount] = useState('');
   const [amount, setAmount] = useState('');
+  const [description, setDescription] = useState('');
   const [txLoading, setTxLoading] = useState(false);
   const [txMessage, setTxMessage] = useState(null);
+  
+  const [expandedTx, setExpandedTx] = useState(null);
+
+  // Activities state
+  const [activities, setActivities] = useState([]);
+  const [loadingActivities, setLoadingActivities] = useState(false);
 
   // Check if current user is System User
   const isSystemUser = user?.email?.toLowerCase() === import.meta.env.VITE_SYSTEM_EMAIL?.toLowerCase();
@@ -39,6 +46,24 @@ export default function UserDashboard() {
       setLoading(false);
     }
   }, [user]);
+
+  useEffect(() => {
+    if (activeTab === 'activity' || activeTab === 'overview') {
+      loadActivities();
+    }
+  }, [activeTab]);
+
+  const loadActivities = async () => {
+    setLoadingActivities(true);
+    try {
+      const resp = await getAllTransactions();
+      setActivities(resp.transactions || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingActivities(false);
+    }
+  };
 
   const loadAccounts = async () => {
     setLoading(true);
@@ -91,8 +116,8 @@ export default function UserDashboard() {
     e.preventDefault();
     setTxMessage(null);
 
-    if (!toAccount || !amount || parseFloat(amount) <= 0) {
-      setTxMessage({ type: 'error', text: 'Please provide valid account ID and positive amount.' });
+    if (!toAccount || !amount || parseFloat(amount) <= 0 || !description.trim()) {
+      setTxMessage({ type: 'error', text: 'Please provide valid account ID, positive amount, and a description.' });
       return;
     }
 
@@ -104,7 +129,8 @@ export default function UserDashboard() {
         await createInitialTransaction({
           toAccount,
           amount: parseFloat(amount),
-          idempotencyKey
+          idempotencyKey,
+          description: description.trim()
         });
         setTxMessage({ type: 'success', text: 'Initial transaction sent successfully!' });
       } else {
@@ -117,7 +143,8 @@ export default function UserDashboard() {
           fromAccount: selectedAccount._id,
           toAccount,
           amount: parseFloat(amount),
-          idempotencyKey
+          idempotencyKey,
+          description: description.trim()
         });
         setTxMessage({ type: 'success', text: 'Transaction sent successfully!' });
         
@@ -128,6 +155,7 @@ export default function UserDashboard() {
       // Reset form
       setToAccount('');
       setAmount('');
+      setDescription('');
     } catch (err) {
       setTxMessage({ type: 'error', text: err.message || 'Transaction failed.' });
     } finally {
@@ -139,6 +167,44 @@ export default function UserDashboard() {
     await logout();
     navigate('/');
   };
+
+  const { currentMonthSpend, trendPercent } = React.useMemo(() => {
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    const lastMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+    const lastMonthYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+
+    let current = 0;
+    let past = 0;
+    
+    activities.forEach(tx => {
+      const txDate = new Date(tx.createdAt);
+      if (tx.status === 'completed') {
+        const isCredit = Array.isArray(accounts) && accounts.some(acc => tx.toAccount?._id === acc._id) || tx.toAccount?.user?.toString() === user?.id;
+        if (!isCredit) {
+          if (txDate.getMonth() === currentMonth && txDate.getFullYear() === currentYear) {
+            current += (tx.amount || 0);
+          } else if (txDate.getMonth() === lastMonth && txDate.getFullYear() === lastMonthYear) {
+            past += (tx.amount || 0);
+          }
+        }
+      }
+    });
+
+    let trend = 0;
+    if (past > 0) {
+      trend = ((current - past) / past) * 100;
+    } else if (current > 0 && past === 0) {
+      trend = 100;
+    }
+
+    return { 
+      currentMonthSpend: current, 
+      trendPercent: parseFloat(trend.toFixed(1)) 
+    };
+  }, [activities, accounts, user]);
 
   if (!user) return null;
 
@@ -156,6 +222,10 @@ export default function UserDashboard() {
         <div className="absolute top-[-10%] right-[-5%] w-[400px] h-[400px] bg-white/[0.03] rounded-full blur-[120px] animate-float-slow" />
         <div className="absolute bottom-[20%] left-[-10%] w-[350px] h-[350px] bg-white/[0.02] rounded-full blur-[100px] animate-float-fast" />
         <div className="absolute top-[40%] left-[30%] w-[250px] h-[250px] bg-white/[0.015] rounded-full blur-[80px] animate-rotate-slow" />
+        {/* Additional Interactive Glowing Elements */}
+        <div className="absolute top-[20%] right-[30%] w-[200px] h-[200px] bg-purple-500/[0.05] rounded-full blur-[90px] animate-pulse animation-delay-2000" />
+        <div className="absolute bottom-[30%] right-[10%] w-[300px] h-[300px] bg-blue-500/[0.04] rounded-full blur-[100px] animate-float-slow animation-delay-4000" />
+        <div className="absolute bottom-[5%] left-[20%] w-[200px] h-[200px] bg-emerald-500/[0.03] rounded-full blur-[80px] animate-float-fast animation-delay-1000" />
       </div>
 
       <main className="flex-1 ml-72 h-screen overflow-y-auto custom-scrollbar relative z-10 bg-transparent">
@@ -206,27 +276,28 @@ export default function UserDashboard() {
                     />
                     <StatCard 
                       title="Monthly Spend" 
-                      value="4,250" 
+                      value={currentMonthSpend.toLocaleString('en-IN')} 
                       suffix="₹"
-                      trend={-12}
+                      trend={trendPercent}
                       icon="📉"
                     />
                   </div>
 
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
                     <div className="lg:col-span-2 space-y-10">
-                      {/* Initialize New Node Prompt */}
-                      <div className="p-8 rounded-3xl border border-white/10 bg-white/[0.03] backdrop-blur-2xl flex items-center justify-between group hover:border-white/20 transition-all duration-500 overflow-hidden relative">
-                        <div className="absolute -left-10 -top-10 w-32 h-32 bg-white/5 rounded-full blur-3xl group-hover:bg-white/10 transition-all" />
+                      {/* Create Another Account Prompt */}
+                      <div className="p-8 rounded-3xl border border-white/10 bg-white/[0.03] backdrop-blur-2xl flex items-center justify-between group hover:border-white/20 hover:bg-white/[0.05] transition-all duration-500 overflow-hidden relative cursor-default">
+                        <div className="absolute -left-10 -top-10 w-40 h-40 bg-white/5 rounded-full blur-3xl group-hover:bg-white/10 group-hover:scale-150 transition-all duration-700 ease-out" />
+                        <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-purple-500/5 rounded-full blur-3xl group-hover:bg-purple-500/10 group-hover:scale-150 transition-all duration-700 ease-out" />
                         <div className="relative z-10">
-                          <h3 className="font-['Syne'] font-bold text-white/90 text-lg mb-1">Scale your Infrastructure</h3>
-                          <p className="text-white/40 text-xs">Deploy a new identity node to increase your liquidity routing capacity.</p>
+                          <h3 className="font-['Syne'] font-bold text-white/90 text-lg mb-1 group-hover:text-white transition-colors">Expand Your Accounts</h3>
+                          <p className="text-white/40 text-xs group-hover:text-white/60 transition-colors">Create another account to separate your finances or scale operations.</p>
                         </div>
                         <button 
                           onClick={handleCreateAccount}
-                          className="relative z-10 px-8 py-4 rounded-2xl bg-white text-black font-['Syne'] font-extrabold uppercase tracking-widest text-[11px] transition-all hover:scale-[1.02] active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.1)] group-hover:shadow-[0_0_30px_rgba(255,255,255,0.2)]"
+                          className="relative z-10 flex items-center gap-2 px-8 py-4 rounded-2xl bg-white text-black font-['Syne'] font-extrabold uppercase tracking-widest text-[11px] transition-all hover:scale-[1.05] hover:-translate-y-1 active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.1)] group-hover:shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:bg-gradient-to-r hover:from-white hover:to-gray-200"
                         >
-                          Initialize New Node
+                          <span>+</span> Create Another Account
                         </button>
                       </div>
 
@@ -255,30 +326,39 @@ export default function UserDashboard() {
                           <button className="text-[10px] uppercase tracking-widest text-white/30 hover:text-white transition-colors">Digital Ledger</button>
                         </div>
                         <div className="space-y-3">
-                          {[
-                            { name: 'Apple Digital', type: 'Payment', amount: '- ₹499', status: 'Completed', color: 'rose' },
-                            { name: isSystemUser ? 'General Credit' : 'System Bonus', type: 'Deposit', amount: '+ ₹2,500', status: 'Success', color: 'emerald' },
-                            { name: 'Amazon Warehouse', type: 'Purchase', amount: '- ₹1,200', status: 'Pending', color: 'amber' }
-                          ].map((item, idx) => (
-                            <div key={idx} className="flex items-center justify-between p-5 rounded-2xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.03] transition-colors">
-                               <div className="flex items-center gap-4">
-                                 <div className={`h-12 w-12 rounded-xl flex items-center justify-center font-bold text-xl bg-${item.color}-500/10 text-${item.color}-400 border border-${item.color}-500/20`}>
-                                   {item.name[0]}
-                                 </div>
-                                 <div>
-                                   <p className="text-sm font-semibold text-white/90">{item.name}</p>
-                                   <p className="text-[10px] uppercase tracking-widest text-white/30">{item.type}</p>
-                                 </div>
-                               </div>
-                               <div className="text-right">
-                                 <p className={`text-sm font-bold ${item.amount.startsWith('+') ? 'text-emerald-400' : 'text-white/90'}`}>{item.amount}</p>
-                                 <p className={`text-[9px] uppercase font-bold tracking-tighter px-1.5 py-0.5 rounded ${
-                                   item.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400' : 
-                                   item.status === 'Pending' ? 'bg-amber-500/10 text-amber-400' : 'bg-rose-500/10 text-rose-400'
-                                 }`}>{item.status}</p>
-                               </div>
-                            </div>
-                          ))}
+                          {loadingActivities ? (
+                            <div className="text-center text-white/30 text-xs py-10 animate-pulse uppercase tracking-widest font-mono">Fetching latest operations...</div>
+                          ) : activities.length === 0 ? (
+                            <div className="text-center text-white/30 text-xs py-10 border border-white/5 rounded-2xl bg-white/[0.01]">No operations found.</div>
+                          ) : (
+                            activities.slice(0, 5).map((tx, idx) => {
+                              const isCredit = Array.isArray(accounts) && accounts.some(acc => tx.toAccount?._id === acc._id) || tx.toAccount?.user?.toString() === user.id;
+                              return (
+                                <div key={tx._id || idx} className="flex items-center justify-between p-5 rounded-2xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.03] transition-colors">
+                                   <div className="flex items-center gap-4">
+                                     <div className={`h-12 w-12 rounded-xl flex items-center justify-center font-bold text-xl ${isCredit ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}`}>
+                                       {isCredit ? '↓' : '↑'}
+                                     </div>
+                                     <div>
+                                       <p className="text-sm font-semibold text-white/90">
+                                         {isCredit ? `From ${tx.fromAccount?.user?.name || (tx.fromAccount?._id ? '...' + tx.fromAccount._id.slice(-4).toUpperCase() : 'System')}` : `To ${tx.toAccount?.user?.name || (tx.toAccount?._id ? '...' + tx.toAccount._id.slice(-4).toUpperCase() : 'Unknown')}`}
+                                       </p>
+                                       <p className="text-[10px] uppercase tracking-widest text-white/30 truncate max-w-[200px]">{tx.description ? `${tx.description} • ` : ''}{new Date(tx.createdAt).toLocaleDateString()}</p>
+                                     </div>
+                                   </div>
+                                   <div className="text-right">
+                                     <p className={`text-sm font-bold ${isCredit ? 'text-emerald-400' : 'text-white/90'}`}>
+                                       {isCredit ? '+' : '-'} ₹{tx.amount?.toLocaleString('en-IN') || '0.00'}
+                                     </p>
+                                     <p className={`text-[9px] uppercase font-bold tracking-tighter px-1.5 py-0.5 rounded inline-block mt-1 ${
+                                       tx.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400' : 
+                                       tx.status === 'pending' ? 'bg-amber-500/10 text-amber-400' : 'bg-rose-500/10 text-rose-400'
+                                     }`}>{tx.status || 'Success'}</p>
+                                   </div>
+                                </div>
+                              );
+                            })
+                          )}
                         </div>
                       </div>
                     </div>
@@ -338,6 +418,17 @@ export default function UserDashboard() {
                               />
                             </div>
                             
+                            <div>
+                              <p className="text-[10px] text-white/20 uppercase tracking-[0.2em] font-bold mb-3 pl-1">Description</p>
+                              <input 
+                                type="text" 
+                                placeholder="What is this for?" 
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                className="w-full bg-[#000] border border-white/10 rounded-xl px-5 py-4 text-xs font-mono text-white focus:outline-none focus:border-white/30 transition-all placeholder:text-white/20"
+                              />
+                            </div>
+                            
                             <button 
                               disabled={txLoading}
                               className="w-full py-5 rounded-2xl bg-white text-black font-['Syne'] font-extrabold uppercase tracking-widest text-[11px] transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50"
@@ -354,17 +445,17 @@ export default function UserDashboard() {
               {activeTab === 'wallets' && (
                 <div className="animate-in fade-in slide-in-from-right-10 duration-700">
                   <div className="flex justify-between items-center mb-10 px-2">
-                    <h3 className="font-['Syne'] font-bold text-2xl text-white/90">Identity Nodes</h3>
-                    <button onClick={handleCreateAccount} className="px-6 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-['Syne'] font-bold tracking-widest text-[10px] hover:bg-white/10 transition-colors uppercase">
-                       + Create New Identity
+                    <h3 className="font-['Syne'] font-bold text-2xl text-white/90">Your Accounts</h3>
+                    <button onClick={handleCreateAccount} className="px-6 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-['Syne'] font-bold tracking-widest text-[10px] hover:bg-white/10 hover:border-white/30 hover:scale-105 transition-all uppercase flex items-center gap-2">
+                       <span className="text-lg leading-none">+</span> Create Another Account
                     </button>
                   </div>
                   
                   {accounts.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-32 border border-white/5 rounded-[40px] bg-white/[0.01]">
                        <div className="h-16 w-16 rounded-3xl bg-white/5 border border-white/5 flex items-center justify-center text-3xl mb-6 opacity-40">💳</div>
-                       <p className="text-white/40 text-sm font-medium">No active identity nodes found in this session.</p>
-                       <button onClick={handleCreateAccount} className="mt-8 text-xs font-bold text-white/60 hover:text-white border-b border-white/20 pb-1">Initialize First Node</button>
+                       <p className="text-white/40 text-sm font-medium">No accounts found in this profile.</p>
+                       <button onClick={handleCreateAccount} className="mt-8 text-xs font-bold text-white/60 hover:text-white border-b border-white/20 hover:border-white pb-1 transition-all">Create First Account</button>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -402,8 +493,124 @@ export default function UserDashboard() {
               )}
 
               {activeTab === 'activity' && (
-                <div className="h-[60vh] flex flex-col items-center justify-center border border-white/5 rounded-[40px] bg-white/[0.01]">
-                   <p className="text-white/20 text-xs tracking-[0.5em] font-medium uppercase animate-pulse">Scanning Global Ledger</p>
+                <div className="animate-in fade-in slide-in-from-right-10 duration-700">
+                  <div className="flex justify-between items-center mb-10 px-2">
+                    <h3 className="font-['Syne'] font-bold text-2xl text-white/90">Global Ledger</h3>
+                    <button onClick={loadActivities} className="px-6 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-['Syne'] font-bold tracking-widest text-[10px] hover:bg-white/10 transition-colors uppercase">
+                       Refresh Ledger
+                    </button>
+                  </div>
+                  
+                  {loadingActivities ? (
+                    <div className="flex flex-col items-center justify-center py-32 border border-white/5 rounded-[40px] bg-white/[0.01]">
+                       <p className="text-white/20 text-xs tracking-[0.5em] font-medium uppercase animate-pulse">Scanning Synchronized Transactions</p>
+                    </div>
+                  ) : activities.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-32 border border-white/5 rounded-[40px] bg-white/[0.01]">
+                       <div className="h-16 w-16 rounded-3xl bg-white/5 border border-white/5 flex items-center justify-center text-3xl mb-6 opacity-40">🧾</div>
+                       <p className="text-white/40 text-sm font-medium">No transactions found in the global ledger.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                       {activities.map((tx, idx) => {
+                         const isCredit = Array.isArray(accounts) && accounts.some(acc => tx.toAccount?._id === acc._id) || tx.toAccount?.user?.toString() === user.id;
+                         const isExpanded = expandedTx === tx._id;
+                         return (
+                           <div key={tx._id || idx} className="flex flex-col p-6 rounded-3xl border border-white/5 bg-white/[0.01] hover:bg-white/[0.02] transition-colors group cursor-pointer" onClick={() => setExpandedTx(isExpanded ? null : tx._id)}>
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-5">
+                                <div className={`h-14 w-14 rounded-2xl flex items-center justify-center font-bold text-2xl ${isCredit ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'} group-hover:scale-105 transition-transform`}>
+                                  {isCredit ? '↓' : '↑'}
+                                </div>
+                                <div>
+                                  <p className="text-sm font-bold text-white/90 mb-1">
+                                    {isCredit 
+                                      ? `Received from ${tx.fromAccount?.user?.name || (tx.fromAccount?._id ? '...' + tx.fromAccount._id.slice(-4).toUpperCase() : 'System')}` 
+                                      : `Sent to ${tx.toAccount?.user?.name || (tx.toAccount?._id ? '...' + tx.toAccount._id.slice(-4).toUpperCase() : 'Unknown')}`}
+                                  </p>
+                                  <p className="text-[10px] uppercase tracking-widest text-white/30 truncate max-w-[300px]">
+                                    {tx.description ? `${tx.description} • ` : ''}{new Date(tx.createdAt).toLocaleString()}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className={`text-lg font-bold ${isCredit ? 'text-emerald-400' : 'text-white/90'}`}>
+                                  {isCredit ? '+' : '-'} ₹{tx.amount?.toLocaleString('en-IN') || '0.00'}
+                                </p>
+                                <p className={`text-[9px] uppercase font-bold tracking-tighter px-2 py-1 rounded mt-1 inline-block ${
+                                  tx.status === 'completed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 
+                                  tx.status === 'pending' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                                }`}>
+                                  {tx.status || 'Success'}
+                                </p>
+                              </div>
+                              </div>
+                              {isExpanded && (
+                                <div className="mt-6 pt-6 border-t border-white/5 animate-in slide-in-from-top-2 fade-in duration-300 cursor-default" onClick={(e) => e.stopPropagation()}>
+                                  <div className="flex items-center justify-between mb-6">
+                                    <h4 className="font-['Syne'] font-bold text-lg text-white/90">Transaction Receipt</h4>
+                                    <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-[10px] font-mono text-white/40 tracking-widest uppercase truncate max-w-[150px]">ID: {tx._id.slice(-8).toUpperCase()}</span>
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-[#000]/30 p-6 rounded-2xl border border-white/5">
+                                    {/* Summary Column */}
+                                    <div className="space-y-6">
+                                      <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                          <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/30 mb-2">Status</p>
+                                          <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border ${tx.status === 'completed' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : tx.status === 'pending' ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-rose-500/10 border-rose-500/20 text-rose-400'}`}>
+                                            <span className="relative flex h-2 w-2">
+                                              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${tx.status === 'completed' ? 'bg-emerald-400' : tx.status === 'pending' ? 'bg-amber-400' : 'bg-rose-400'}`}></span>
+                                              <span className={`relative inline-flex rounded-full h-2 w-2 ${tx.status === 'completed' ? 'bg-emerald-500' : tx.status === 'pending' ? 'bg-amber-500' : 'bg-rose-500'}`}></span>
+                                            </span>
+                                            <span className="text-[11px] font-bold tracking-wider uppercase">{tx.status ? tx.status : 'UNKNOWN'}</span>
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/30 mb-2">Date & Time</p>
+                                          <p className="text-[13px] text-white/80 font-mono mt-1 pr-1">{new Date(tx.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</p>
+                                        </div>
+                                      </div>
+                                      <div>
+                                        <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/30 mb-2">Description</p>
+                                        <p className="text-sm text-white/70 italic border-l-2 border-white/10 pl-3 leading-relaxed">{tx.description || 'No description provided.'}</p>
+                                      </div>
+                                    </div>
+                                    
+                                    {/* Parties Column */}
+                                    <div className="space-y-4">
+                                      <div className="bg-white/[0.02] p-4 rounded-xl border border-white/10 flex items-center justify-between group-hover:border-white/20 transition-colors">
+                                        <div>
+                                          <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/30 mb-1">Sender</p>
+                                          <p className="text-sm font-bold text-white/90 mb-1">{tx.fromAccount?.user?.name || 'System'}</p>
+                                        </div>
+                                        <div className="text-right">
+                                          <p className="text-[10px] font-mono text-white/30 mt-4 truncate max-w-[120px]">{tx.fromAccount?._id || 'SYSTEM_DEFAULT'}</p>
+                                        </div>
+                                      </div>
+                                      
+                                      <div className="bg-white/[0.02] p-4 rounded-xl border border-white/10 flex items-center justify-between group-hover:border-white/20 transition-colors">
+                                        <div>
+                                          <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/30 mb-1">Receiver</p>
+                                          <p className="text-sm font-bold text-white/90 mb-1">{tx.toAccount?.user?.name || 'Unknown'}</p>
+                                        </div>
+                                        <div className="text-right">
+                                          <p className="text-[10px] font-mono text-white/30 mt-4 truncate max-w-[120px]">{tx.toAccount?._id || 'UNKNOWN_ACCOUNT'}</p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="mt-6 text-center">
+                                     <p className="text-[10px] font-mono text-white/20 uppercase tracking-widest">Ref: {tx.idempotencyKey || 'N/A'}</p>
+                                  </div>
+                                </div>
+                              )}
+                           </div>
+                         );
+                       })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
