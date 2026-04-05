@@ -6,6 +6,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon --exec tsx server.ts",
+    "seed:system": "tsx seedSystemAccount.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

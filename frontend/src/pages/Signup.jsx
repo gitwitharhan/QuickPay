@@ -1,8 +1,59 @@
-// import React from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import AbstractLogo from '../components/AbstractLogo';
+import { useAuth } from '../context/AuthContext';
 
 export default function Signup() {
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const { register } = useAuth();
+  const navigate = useNavigate();
+
+  const validateForm = () => {
+    if (!firstName || !lastName || !email || !password) {
+      return 'All fields are required.';
+    }
+    if (firstName.length < 2 || lastName.length < 2) {
+      return 'Names must be at least 2 characters long.';
+    }
+    if (!/\S+@\S+\.\S+/.test(email)) {
+      return 'Please enter a valid email address.';
+    }
+    if (password.length < 8) {
+      return 'Password must be at least 8 characters long.';
+    }
+    if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
+      return 'Password must contain at least one uppercase letter, one lowercase letter, and one number.';
+    }
+    return null;
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError(null);
+
+    const validationError = validateForm();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const fullName = `${firstName} ${lastName}`.trim();
+      await register(fullName, email, password);
+      navigate('/dashboard');
+    } catch (err) {
+      setError(err.message || 'Registration failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div style={{
       minHeight: "100vh",
@@ -28,9 +79,9 @@ export default function Signup() {
         width: "100%", maxWidth: "440px", zIndex: 2
       }}>
         <div style={{ marginBottom: "30px", textAlign: "center" }}>
-          <Link to="/" style={{ textDecoration: "none", color: "#fff", display: "inline-flex", alignItems: "center", gap: "10px" }}>
-            <AbstractLogo size={24} />
-            <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "1.1rem" }}>QuickPay</span>
+          <Link to="/" style={{ textDecoration: "none", color: "#fff", display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "12px", width: "100%" }}>
+            <AbstractLogo size={28} />
+            <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 800, fontSize: "1.2rem", color: "#fff", letterSpacing: "-0.02em" }}>QuickPay</span>
           </Link>
         </div>
 
@@ -44,47 +95,80 @@ export default function Signup() {
           <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: "1.8rem", fontWeight: 700, color: "#b3b3b3", marginBottom: "8px", textAlign: "center" }}>Create your account</h2>
           <p style={{ fontSize: "0.9rem", color: "rgba(255,255,255,0.5)", marginBottom: "32px", textAlign: "center" }}>Start routing capital at light speed.</p>
 
-          <form style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          {error && (
+            <div style={{ background: "rgba(220, 53, 69, 0.1)", border: "1px solid rgba(220, 53, 69, 0.3)", color: "#ff8787", padding: "12px", borderRadius: "8px", fontSize: "0.85rem", marginBottom: "20px", textAlign: "center" }}>
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
             <div style={{ display: "flex", gap: "16px" }}>
               <div style={{ flex: 1 }}>
                 <label style={{ display: "block", fontSize: "0.85rem", color: "rgba(255,255,255,0.7)", marginBottom: "8px" }}>First name</label>
-                <input type="text" placeholder="John" style={{
-                  width: "100%", padding: "12px 16px", borderRadius: "8px",
-                  border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)",
-                  color: "#fff", fontSize: "0.95rem", outline: "none"
-                }} />
+                <input 
+                  type="text" 
+                  placeholder="John" 
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  style={{
+                    width: "100%", padding: "12px 16px", borderRadius: "8px",
+                    border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)",
+                    color: "#fff", fontSize: "0.95rem", outline: "none"
+                  }} 
+                />
               </div>
               <div style={{ flex: 1 }}>
                 <label style={{ display: "block", fontSize: "0.85rem", color: "rgba(255,255,255,0.7)", marginBottom: "8px" }}>Last name</label>
-                <input type="text" placeholder="Doe" style={{
-                  width: "100%", padding: "12px 16px", borderRadius: "8px",
-                  border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)",
-                  color: "#fff", fontSize: "0.95rem", outline: "none"
-                }} />
+                <input 
+                  type="text" 
+                  placeholder="Doe" 
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  style={{
+                    width: "100%", padding: "12px 16px", borderRadius: "8px",
+                    border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)",
+                    color: "#fff", fontSize: "0.95rem", outline: "none"
+                  }} 
+                />
               </div>
             </div>
             <div>
               <label style={{ display: "block", fontSize: "0.85rem", color: "rgba(255,255,255,0.7)", marginBottom: "8px" }}>Email address</label>
-              <input type="email" placeholder="name@company.com" style={{
-                width: "100%", padding: "12px 16px", borderRadius: "8px",
-                border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)",
-                color: "#fff", fontSize: "0.95rem", outline: "none"
-              }} />
+              <input 
+                type="email" 
+                placeholder="name@company.com" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                style={{
+                  width: "100%", padding: "12px 16px", borderRadius: "8px",
+                  border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)",
+                  color: "#fff", fontSize: "0.95rem", outline: "none"
+                }} 
+              />
             </div>
             <div>
               <label style={{ display: "block", fontSize: "0.85rem", color: "rgba(255,255,255,0.7)", marginBottom: "8px" }}>Password</label>
-              <input type="password" placeholder="••••••••" style={{
-                width: "100%", padding: "12px 16px", borderRadius: "8px",
-                border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)",
-                color: "#fff", fontSize: "0.95rem", outline: "none"
-              }} />
+              <input 
+                type="password" 
+                placeholder="••••••••" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                style={{
+                  width: "100%", padding: "12px 16px", borderRadius: "8px",
+                  border: "1px solid rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.05)",
+                  color: "#fff", fontSize: "0.95rem", outline: "none"
+                }} 
+              />
             </div>
             
-            <button type="button" style={{
+            <button type="submit" disabled={isLoading} style={{
               width: "100%", padding: "14px", marginTop: "10px", borderRadius: "8px",
-              background: "linear-gradient(135deg, #fff 0%, #ccc 100%)", border: "none",
-              color: "#000", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "0.95rem", cursor: "pointer"
-            }}>Sign Up</button>
+              background: isLoading ? "rgba(255,255,255,0.5)" : "linear-gradient(135deg, #fff 0%, #ccc 100%)", border: "none",
+              color: "#000", fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: "0.95rem", 
+              cursor: isLoading ? "not-allowed" : "pointer", transition: "opacity 0.2s"
+            }}>
+               {isLoading ? 'Creating...' : 'Sign Up'}
+            </button>
           </form>
 
           <div style={{ marginTop: "24px", textAlign: "center", fontSize: "0.85rem", color: "rgba(255,255,255,0.5)" }}>

@@ -620,8 +620,8 @@ export default function LandingPage() {
         display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:"30px",
       }}>
         <div style={{ display:"flex",alignItems:"center",gap:"12px" }}>
-          <AbstractLogo size={24} />
-          <span style={{ fontFamily:"'Syne',sans-serif",fontSize:"1.05rem",fontWeight:700,color:"rgba(255,255,255,.4)" }}>QuickPay</span>
+          <AbstractLogo size={28} />
+          <span style={{ fontFamily:"'Syne',sans-serif",fontSize:"1.1rem",fontWeight:800,color:"rgba(255,255,255,.4)" }}>QuickPay</span>
         </div>
         <p style={{ fontFamily:"'Inter',sans-serif",fontSize:".9rem",color:"rgba(255,255,255,.25)",letterSpacing:".02em" }}>
           © 2026 QuickPay Systems · Fully Compliant

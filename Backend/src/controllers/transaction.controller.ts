@@ -84,7 +84,7 @@ export const createTransaction = async (req: any, res: any) => {
         { session }
       );
 
-      await (()=> new Promise(resolve => setTimeout(resolve, 1000*10)))(); // Simulate processing delay  
+      await (()=> new Promise(resolve => setTimeout(resolve, 1000)))(); // Simulate processing delay  
 
       // @ts-ignore
       const creditLedgerEntry = await Ledger.create([ 
@@ -175,8 +175,13 @@ export const createInitialTransaction = async (req: any, res: any) => {
     if (toAcc.status !== "active") {  
       return res.status(400).json({ message: "Account must be active" });
     }
-    // @ts-ignore
-    const systemUserAccount = await Account.findOne({ systemAccount: true }).select("+systemAccount");
+    // Find the system user first (systemUser flag works correctly with .select("+systemUser"))
+    const systemUser = await User.findOne({ systemUser: true }).select("+systemUser");
+    if (!systemUser) {
+      return res.status(500).json({ message: "System user not found" });
+    }
+    // Then find their account by userId (avoids querying the select:false systemAccount field)
+    const systemUserAccount = await Account.findOne({ user: systemUser._id });
     if(!systemUserAccount){
       return res.status(500).json({ message: "System user account not found" });
     }
