@@ -27,6 +27,27 @@ export default function UserDashboard() {
   
   const [expandedTx, setExpandedTx] = useState(null);
 
+  // Account ID visibility and copy states
+  const [revealedAccounts, setRevealedAccounts] = useState(new Set());
+  const [copiedAccount, setCopiedAccount] = useState(null);
+
+  const toggleReveal = (e, accId) => {
+    e.stopPropagation();
+    setRevealedAccounts(prev => {
+      const next = new Set(prev);
+      if (next.has(accId)) next.delete(accId);
+      else next.add(accId);
+      return next;
+    });
+  };
+
+  const copyAccountId = (e, accId) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(accId);
+    setCopiedAccount(accId);
+    setTimeout(() => setCopiedAccount(null), 2000);
+  };
+
   // Activities state
   const [activities, setActivities] = useState([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
@@ -492,7 +513,37 @@ export default function UserDashboard() {
                              )}
                            </div>
                            <p className="text-xs uppercase tracking-[0.3em] font-bold text-white/20 mb-2">Vault Reference</p>
-                           <p className="text-2xl font-mono tracking-tighter text-white/80 group-hover:text-white">**** **** **** {acc._id.slice(-4).toUpperCase()}</p>
+                           <div className="flex items-center gap-3">
+                             <p className="text-2xl font-mono tracking-tighter text-white/80 group-hover:text-white">
+                               {revealedAccounts.has(acc._id) ? acc._id : `**** **** **** ${acc._id.slice(-4).toUpperCase()}`}
+                             </p>
+                             <button
+                               onClick={(e) => toggleReveal(e, acc._id)}
+                               className="p-2 rounded-lg bg-white/5 border border-white/10 text-white/40 hover:text-white hover:bg-white/10 hover:border-white/20 transition-all active:scale-90"
+                               title={revealedAccounts.has(acc._id) ? 'Hide ID' : 'Show ID'}
+                             >
+                               {revealedAccounts.has(acc._id) ? (
+                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                               ) : (
+                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                               )}
+                             </button>
+                             <button
+                               onClick={(e) => copyAccountId(e, acc._id)}
+                               className={`p-2 rounded-lg border transition-all active:scale-90 ${
+                                 copiedAccount === acc._id
+                                   ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                                   : 'bg-white/5 border-white/10 text-white/40 hover:text-white hover:bg-white/10 hover:border-white/20'
+                               }`}
+                               title="Copy Account ID"
+                             >
+                               {copiedAccount === acc._id ? (
+                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                               ) : (
+                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                               )}
+                             </button>
+                           </div>
                            <div className="mt-12 flex justify-between items-end">
                              <div>
                                <p className="text-[10px] uppercase tracking-widest text-white/30 mb-1">Contract Owner</p>

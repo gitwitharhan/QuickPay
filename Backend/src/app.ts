@@ -24,12 +24,18 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json());
+app.use(express.json()); 
+app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
-
+app.use(express.static('public'));
+app.use()
 /** Routes */ 
 app.use('/api/auth', authRoutes);
 app.use('/api/account', accountRoutes);
 app.use('/api/transaction', transactionRoutes);
- 
+
+app.get('/', (req, res) => {
+  res.send('Hello World!');
+});
+
 export default app;
