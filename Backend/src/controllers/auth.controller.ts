@@ -43,7 +43,7 @@ export const register = async (req: any, res: any) => {
     res.status(201).json({ message: "User registered successfully",user: { id: newUser._id, name: newUser.name, email: newUser.email } , token  });
   } catch (error) {
     console.error("Registration error:", error);
-    res.status(500).json({ message: "Server error during registration" });
+    res.status(500).json({ message: "Server error during registration", error: error instanceof Error ? error.message : String(error) });
   }
 }
 
@@ -52,27 +52,44 @@ export const register = async (req: any, res: any) => {
  * post /api/auth/login
  */
 export const login = async (req: any, res: any) => {
+  console.log("=== LOGIN REQUEST RECEIVED ===");
+  console.log("Body:", JSON.stringify(req.body));
   try {
     const { email, password } = req.body;
+    console.log("Step 1: Extracted email:", email);
 
     const user = await User.findOne({ email }).select("+password");
+    console.log("Step 2: User found:", !!user);
     if (!user) {
       return res.status(400).json({ message: "Invalid email or password" });
     }
 
     const isMatch = await user.comparePassword(password);
+    console.log("Step 3: Password match:", isMatch);
     if (!isMatch) {
       return res.status(400).json({ message: "Invalid email or password" });
     }
 
+    console.log("Step 4: JWT_SECRET exists:", !!JWT_SECRET);
     const token = jwt.sign({ id: user._id }, JWT_SECRET!, { expiresIn: "3d" });
+    console.log("Step 5: Token generated");
+
+    console.log("Step 6: Redis URL exists:", !!process.env.REDIS_URL);
+    console.log("Step 6b: Redis TOKEN exists:", !!process.env.REDIS_TOKEN);
     await redis.set(`user:${user._id}`, token, { ex: 3 * 24 * 60 * 60 });
+    console.log("Step 7: Redis set done");
+
     res.cookie("token", token, authCookieOptions);
+    console.log("Step 8: Cookie set, sending response");
 
     res.json({ message: "Login successful", user: { id: user._id, name: user.name, email: user.email }, token });
+    console.log("=== LOGIN SUCCESS ===");
   } catch (error) {
-    console.error("Login error:", error);
-    res.status(500).json({ message: "Server error during login" });
+    console.error("=== LOGIN ERROR ===");
+    console.error("Error name:", error instanceof Error ? error.name : "unknown");
+    console.error("Error message:", error instanceof Error ? error.message : String(error));
+    console.error("Full error:", error);
+    res.status(500).json({ message: "Server error during login", error: error instanceof Error ? error.message : String(error) });
   }
 }
 
