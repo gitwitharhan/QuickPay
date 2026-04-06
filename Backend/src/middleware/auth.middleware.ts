@@ -26,7 +26,7 @@ export const authenticate = async (req: any, res: any, next: any) => {
       return res.status(401).json({ message: "Session expired or logged in from another device" });
     }
 
-    const user = await User.findById(decoded.id);
+    const user = await User.findById(decoded.id).select("+systemUser");
     if (!user) {
       return res.status(401).json({ message: "Invalid token" });
     }
