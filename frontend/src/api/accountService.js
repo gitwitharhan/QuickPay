@@ -1,8 +1,9 @@
-import BASE_URL from './baseUrl';
 import { getAuthHeaders } from './authStorage';
 
+const API = import.meta.env.VITE_BACKEND_URL;
+
 export const fetchUserAccounts = async () => {
-  const res = await fetch(`${BASE_URL}/api/account/allAccounts`, {
+  const res = await fetch(`${API}/api/account/allAccounts`, {
     headers: getAuthHeaders(),
     credentials: 'include'
   });
@@ -12,7 +13,7 @@ export const fetchUserAccounts = async () => {
 };
 
 export const fetchAccountDetails = async (accountId) => {
-  const res = await fetch(`${BASE_URL}/api/account/${accountId}`, {
+  const res = await fetch(`${API}/api/account/${accountId}`, {
     headers: getAuthHeaders(),
     credentials: 'include'
   });
@@ -22,7 +23,7 @@ export const fetchAccountDetails = async (accountId) => {
 };
 
 export const createAccount = async () => {
-  const res = await fetch(`${BASE_URL}/api/account/createAccount`, {
+  const res = await fetch(`${API}/api/account/createAccount`, {
     method: 'POST',
     headers: getAuthHeaders(),
     credentials: 'include'

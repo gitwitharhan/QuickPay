@@ -1,10 +1,9 @@
-import BASE_URL from './baseUrl';
 import { getAuthHeaders } from './authStorage';
 
+const API = import.meta.env.VITE_BACKEND_URL;
+
 export const loginUser = async (email, password) => {
-  const url = `${BASE_URL}/api/auth/login`;
-  console.log('Attempting login at:', url);
-  const res = await fetch(url, {
+  const res = await fetch(`${API}/api/auth/login`, {
     method: 'POST',
     headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ email, password }),
@@ -16,7 +15,7 @@ export const loginUser = async (email, password) => {
 };
 
 export const registerUser = async (name, email, password) => {
-  const res = await fetch(`${BASE_URL}/api/auth/register`, {
+  const res = await fetch(`${API}/api/auth/register`, {
     method: 'POST',
     headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ name, email, password }),
@@ -28,7 +27,7 @@ export const registerUser = async (name, email, password) => {
 };
 
 export const logoutUser = async () => {
-  const res = await fetch(`${BASE_URL}/api/auth/logout`, {
+  const res = await fetch(`${API}/api/auth/logout`, {
     method: 'POST',
     headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     credentials: 'include'

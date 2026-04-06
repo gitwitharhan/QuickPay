@@ -1,8 +1,9 @@
-import BASE_URL from './baseUrl';
 import { getAuthHeaders } from './authStorage';
 
+const API = import.meta.env.VITE_BACKEND_URL;
+
 export const createTransaction = async (payload) => {
-  const res = await fetch(`${BASE_URL}/api/transaction/create`, {
+  const res = await fetch(`${API}/api/transaction/create`, {
     method: 'POST',
     headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
@@ -14,7 +15,7 @@ export const createTransaction = async (payload) => {
 };
 
 export const createInitialTransaction = async (payload) => {
-  const res = await fetch(`${BASE_URL}/api/transaction/initial`, {
+  const res = await fetch(`${API}/api/transaction/initial`, {
     method: 'POST',
     headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
@@ -26,7 +27,7 @@ export const createInitialTransaction = async (payload) => {
 };
 
 export const getAllTransactions = async () => {
-  const res = await fetch(`${BASE_URL}/api/transaction/all`, {
+  const res = await fetch(`${API}/api/transaction/all`, {
     method: 'GET',
     headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     credentials: 'include'
