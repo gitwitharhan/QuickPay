@@ -2,7 +2,9 @@ import BASE_URL from './baseUrl';
 import { getAuthHeaders } from './authStorage';
 
 export const loginUser = async (email, password) => {
-  const res = await fetch(`${BASE_URL}/api/auth/login`, {
+  const url = `${BASE_URL}/api/auth/login`;
+  console.log('Attempting login at:', url);
+  const res = await fetch(url, {
     method: 'POST',
     headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ email, password }),
