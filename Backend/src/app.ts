@@ -4,6 +4,8 @@ import authRoutes from './routes/auth.routes';
 import accountRoutes from './routes/account.routes';
 import cookieParser from 'cookie-parser';
 import transactionRoutes from './routes/transaction.routes';
+import accountRequestRoutes from './routes/accountRequest.routes';
+
 
 const app = express();
 const normalizeOrigin = (origin: string) => origin.replace(/\/$/, '');
@@ -51,6 +53,8 @@ app.use(express.static('public'));
 app.use('/api/auth', authRoutes);
 app.use('/api/account', accountRoutes);
 app.use('/api/transaction', transactionRoutes);
+app.use('/api/account-request', accountRequestRoutes);
+
 
 app.get('/', (req, res) => {
   res.send('Hello World!');

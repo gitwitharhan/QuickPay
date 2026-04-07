@@ -8,7 +8,7 @@ export default function Sidebar({ activeTab, setActiveTab, user, onLogout, isOpe
     { id: 'overview', label: 'Overview', icon: '📊' },
     { id: 'wallets', label: isSystemUser ? 'User Directory' : 'My Wallets', icon: '💳' },
     { id: 'activity', label: 'Activity', icon: '📝' },
-    { id: 'security', label: 'Security', icon: '🛡️' },
+    { id: 'requests', label: 'User Requests', icon: '📋' },
   ];
 
   return (

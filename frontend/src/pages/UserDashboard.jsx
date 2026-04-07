@@ -6,6 +6,7 @@ import Sidebar from '../components/Sidebar';
 import StatCard from '../components/StatCard';
 import { fetchUserAccounts, fetchAccountDetails, createAccount, fetchAllUsersAccounts } from '../api/accountService';
 import { createTransaction, createInitialTransaction, getAllTransactions, systemWithdrawal } from '../api/transactionService';
+import { createAccountRequest, getMyRequests, getAllAccountRequests, reviewAccountRequest } from '../api/accountRequestService';
 
 export default function UserDashboard() {
   const { user, logout } = useAuth();
@@ -35,6 +36,15 @@ export default function UserDashboard() {
 
   const [revealedAccounts, setRevealedAccounts] = useState(new Set());
   const [copiedAccount, setCopiedAccount] = useState(null);
+
+  // Account Requests state
+  const [requests, setRequests] = useState([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
+  const [requestSubmitting, setRequestSubmitting] = useState(false);
+  const [requestMsg, setRequestMsg] = useState(null);
+  const [reviewNotes, setReviewNotes] = useState({});
+  const [reviewAmounts, setReviewAmounts] = useState({});
+  const [reviewLoading, setReviewLoading] = useState({});
 
   const toggleReveal = (e, accId) => {
     e.stopPropagation();
@@ -75,6 +85,9 @@ export default function UserDashboard() {
         loadActivities();
       }
     }
+    if (activeTab === 'requests') {
+      loadRequests();
+    }
   }, [activeTab]);
 
   const loadActivities = async () => {
@@ -87,6 +100,43 @@ export default function UserDashboard() {
       handleApiError(err);
     } finally {
       setLoadingActivities(false);
+    }
+  };
+
+  const loadRequests = async () => {
+    setRequestsLoading(true);
+    try {
+      if (isSystemUser) {
+        const data = await getAllAccountRequests();
+        setRequests(data.requests || []);
+      } else {
+        const data = await getMyRequests();
+        setRequests(data.requests || []);
+      }
+    } catch (err) {
+      console.error(err);
+      handleApiError(err);
+    } finally {
+      setRequestsLoading(false);
+    }
+  };
+
+  const handleReviewRequest = async (requestId, action) => {
+    setReviewLoading(prev => ({ ...prev, [requestId]: action }));
+    setRequestMsg(null);
+    try {
+      await reviewAccountRequest(
+        requestId,
+        action,
+        reviewNotes[requestId] || '',
+        parseFloat(reviewAmounts[requestId]) || 0
+      );
+      setRequestMsg({ type: 'success', text: `Request ${action === 'approve' ? 'approved' : 'rejected'} successfully.` });
+      await loadRequests();
+    } catch (err) {
+      setRequestMsg({ type: 'error', text: err.message || 'Failed to review request.' });
+    } finally {
+      setReviewLoading(prev => ({ ...prev, [requestId]: null }));
     }
   };
 
@@ -137,15 +187,19 @@ export default function UserDashboard() {
   };
 
   const handleCreateAccount = async () => {
-    setLoading(true);
+    setRequestSubmitting(true);
+    setRequestMsg(null);
     try {
-      await createAccount();
-      await loadAccounts();
+      await createAccountRequest();
+      setRequestMsg({ type: 'success', text: 'Request submitted! Awaiting system approval.' });
+      // Switch to requests tab to show status
+      setActiveTab('requests');
     } catch (err) {
       if (!handleApiError(err)) {
-        setError('Failed to create account. ' + (err.message || ''));
+        setRequestMsg({ type: 'error', text: err.message || 'Failed to submit request.' });
       }
-      setLoading(false);
+    } finally {
+      setRequestSubmitting(false);
     }
   };
 
@@ -328,7 +382,7 @@ export default function UserDashboard() {
             <div>
               <p className="text-white/30 text-[10px] uppercase tracking-[0.2em] font-medium mb-2 font-['Syne']">QuickPay Platform v1.0</p>
               <h1 className="text-4xl font-extrabold tracking-tight font-['Syne'] text-white/90">
-                {activeTab === 'overview' ? `Welcome, ${user.name.split(' ')[0]}` : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+                {activeTab === 'overview' ? `Welcome, ${user.name.split(' ')[0]}` : activeTab === 'requests' ? 'User Requests' : activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
               </h1>
             </div>
             <div className="text-left md:text-right">
@@ -389,9 +443,10 @@ export default function UserDashboard() {
                            </div>
                            <button 
                              onClick={handleCreateAccount}
-                             className="relative z-10 flex items-center gap-2 px-6 md:px-8 py-3 md:py-4 rounded-2xl bg-white text-black font-['Syne'] font-extrabold uppercase tracking-widest text-[11px] transition-all hover:scale-[1.05] hover:-translate-y-1 active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.1)] group-hover:shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:bg-gradient-to-r hover:from-white hover:to-gray-200 w-full md:w-auto justify-center"
+                             disabled={requestSubmitting}
+                             className="relative z-10 flex items-center gap-2 px-6 md:px-8 py-3 md:py-4 rounded-2xl bg-white text-black font-['Syne'] font-extrabold uppercase tracking-widest text-[11px] transition-all hover:scale-[1.05] hover:-translate-y-1 active:scale-95 shadow-[0_0_20px_rgba(255,255,255,0.1)] group-hover:shadow-[0_0_30px_rgba(255,255,255,0.3)] hover:bg-gradient-to-r hover:from-white hover:to-gray-200 w-full md:w-auto justify-center disabled:opacity-50"
                            >
-                             <span>+</span> Create Another Account
+                             <span>+</span> {requestSubmitting ? 'Submitting...' : 'Request Another Account'}
                            </button>
                          </div>
                        )}
@@ -559,8 +614,8 @@ export default function UserDashboard() {
                   <div className="flex justify-between items-center mb-10 px-2">
                     <h3 className="font-['Syne'] font-bold text-2xl text-white/90">{isSystemUser ? "User Directory" : "Your Accounts"}</h3>
                     {!isSystemUser && (
-                      <button onClick={handleCreateAccount} className="px-6 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-['Syne'] font-bold tracking-widest text-[10px] hover:bg-white/10 hover:border-white/30 hover:scale-105 transition-all uppercase flex items-center gap-2">
-                         <span className="text-lg leading-none">+</span> Create Another Account
+                      <button onClick={handleCreateAccount} disabled={requestSubmitting} className="px-6 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-['Syne'] font-bold tracking-widest text-[10px] hover:bg-white/10 hover:border-white/30 hover:scale-105 transition-all uppercase flex items-center gap-2 disabled:opacity-50">
+                         <span className="text-lg leading-none">+</span> {requestSubmitting ? 'Submitting...' : 'Request Another Account'}
                       </button>
                     )}
                   </div>
@@ -569,7 +624,7 @@ export default function UserDashboard() {
                     <div className="flex flex-col items-center justify-center py-32 border border-white/5 rounded-[40px] bg-white/[0.01]">
                        <div className="h-16 w-16 rounded-3xl bg-white/5 border border-white/5 flex items-center justify-center text-3xl mb-6 opacity-40">💳</div>
                        <p className="text-white/40 text-sm font-medium">{isSystemUser ? "No users found in the system." : "No accounts found in this profile."}</p>
-                       {!isSystemUser && <button onClick={handleCreateAccount} className="mt-8 text-xs font-bold text-white/60 hover:text-white border-b border-white/20 hover:border-white pb-1 transition-all">Create First Account</button>}
+                       {!isSystemUser && <button onClick={handleCreateAccount} disabled={requestSubmitting} className="mt-8 text-xs font-bold text-white/60 hover:text-white border-b border-white/20 hover:border-white pb-1 transition-all disabled:opacity-50">{requestSubmitting ? 'Submitting...' : 'Request First Account'}</button>}
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -813,6 +868,141 @@ export default function UserDashboard() {
                   )}
                 </div>
               )}
+
+              {activeTab === 'requests' && (
+                <div className="animate-in fade-in slide-in-from-right-10 duration-700">
+                  <div className="flex justify-between items-center mb-10 px-2">
+                    <h3 className="font-['Syne'] font-bold text-2xl text-white/90">
+                      {isSystemUser ? 'Pending Account Requests' : 'My Account Requests'}
+                    </h3>
+                    <button onClick={loadRequests} className="px-6 py-3 rounded-xl bg-white/5 border border-white/10 text-white font-['Syne'] font-bold tracking-widest text-[10px] hover:bg-white/10 transition-colors uppercase">
+                      Refresh
+                    </button>
+                  </div>
+
+                  {requestMsg && (
+                    <div className={`p-4 rounded-xl text-xs mb-6 text-center border ${
+                      requestMsg.type === 'error' ? 'bg-rose-500/5 border-rose-500/20 text-rose-400' : 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400'
+                    }`}>
+                      {requestMsg.text}
+                    </div>
+                  )}
+
+                  {requestsLoading ? (
+                    <div className="flex flex-col items-center justify-center py-32 border border-white/5 rounded-[40px] bg-white/[0.01]">
+                      <p className="text-white/20 text-xs tracking-[0.5em] font-medium uppercase animate-pulse">Loading Requests...</p>
+                    </div>
+                  ) : requests.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-32 border border-white/5 rounded-[40px] bg-white/[0.01]">
+                      <div className="h-16 w-16 rounded-3xl bg-white/5 border border-white/5 flex items-center justify-center text-3xl mb-6 opacity-40">📋</div>
+                      <p className="text-white/40 text-sm font-medium">
+                        {isSystemUser ? 'No pending requests at this time.' : 'You have not submitted any account requests.'}
+                      </p>
+                      {!isSystemUser && (
+                        <button
+                          onClick={handleCreateAccount}
+                          disabled={requestSubmitting}
+                          className="mt-8 px-6 py-3 rounded-xl bg-white text-black font-['Syne'] font-extrabold uppercase tracking-widest text-[11px] hover:scale-105 active:scale-95 transition-all disabled:opacity-50"
+                        >
+                          {requestSubmitting ? 'Submitting...' : '+ Request New Account'}
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {requests.map((req) => {
+                        const statusColor =
+                          req.status === 'approved' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20' :
+                          req.status === 'rejected' ? 'text-rose-400 bg-rose-500/10 border-rose-500/20' :
+                          'text-amber-400 bg-amber-500/10 border-amber-500/20';
+
+                        return (
+                          <div key={req._id} className="p-6 rounded-3xl border border-white/5 bg-white/[0.02] backdrop-blur-2xl space-y-4">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                              <div className="space-y-1">
+                                {isSystemUser && (
+                                  <p className="text-sm font-bold text-white/90">
+                                    {req.user?.name} <span className="text-white/30 font-normal">({req.user?.email})</span>
+                                  </p>
+                                )}
+                                <p className="text-[10px] uppercase tracking-widest text-white/30">
+                                  Requested on {new Date(req.createdAt).toLocaleString()}
+                                </p>
+                              </div>
+                              <span className={`self-start md:self-auto px-3 py-1.5 rounded-lg border text-[11px] font-bold uppercase tracking-widest ${statusColor}`}>
+                                {req.status}
+                              </span>
+                            </div>
+
+                            {req.reviewNote && (
+                              <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
+                                <p className="text-[10px] uppercase tracking-widest text-white/30 mb-1">Review Note</p>
+                                <p className="text-sm text-white/70 italic">{req.reviewNote}</p>
+                              </div>
+                            )}
+
+                            {isSystemUser && req.status === 'pending' && (
+                              <div className="pt-4 border-t border-white/5 space-y-3">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  <div>
+                                    <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/30 mb-2 pl-1">Review Note (optional)</p>
+                                    <input
+                                      type="text"
+                                      placeholder="Add a note for the user..."
+                                      value={reviewNotes[req._id] || ''}
+                                      onChange={e => setReviewNotes(prev => ({ ...prev, [req._id]: e.target.value }))}
+                                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-xs focus:outline-none focus:border-white/30 transition-all placeholder:text-white/20"
+                                    />
+                                  </div>
+                                  <div>
+                                    <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-white/30 mb-2 pl-1">Initial Deposit ₹ (optional)</p>
+                                    <input
+                                      type="number"
+                                      placeholder="0.00"
+                                      value={reviewAmounts[req._id] || ''}
+                                      onChange={e => setReviewAmounts(prev => ({ ...prev, [req._id]: e.target.value }))}
+                                      className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white text-xs focus:outline-none focus:border-white/30 transition-all placeholder:text-white/10"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="flex gap-3">
+                                  <button
+                                    onClick={() => handleReviewRequest(req._id, 'approve')}
+                                    disabled={!!reviewLoading[req._id]}
+                                    className="flex-1 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold uppercase tracking-widest text-[10px] hover:bg-emerald-500/20 transition-colors disabled:opacity-50"
+                                  >
+                                    {reviewLoading[req._id] === 'approve' ? 'Processing...' : '✓ Approve'}
+                                  </button>
+                                  <button
+                                    onClick={() => handleReviewRequest(req._id, 'reject')}
+                                    disabled={!!reviewLoading[req._id]}
+                                    className="flex-1 py-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 font-bold uppercase tracking-widest text-[10px] hover:bg-rose-500/20 transition-colors disabled:opacity-50"
+                                  >
+                                    {reviewLoading[req._id] === 'reject' ? 'Processing...' : '✗ Reject'}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {!isSystemUser && requests.length > 0 && requests.every(r => r.status !== 'pending') && (
+                    <div className="mt-8 text-center">
+                      <button
+                        onClick={handleCreateAccount}
+                        disabled={requestSubmitting}
+                        className="px-8 py-4 rounded-2xl bg-white text-black font-['Syne'] font-extrabold uppercase tracking-widest text-[11px] hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
+                      >
+                        {requestSubmitting ? 'Submitting...' : '+ Request Another Account'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
             </div>
           )}
         </div>
