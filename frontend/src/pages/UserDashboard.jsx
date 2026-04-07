@@ -212,6 +212,7 @@ export default function UserDashboard() {
       await systemWithdrawal({
         fromAccount: accountId,
         amount: parseFloat(withdrawAmount),
+        idempotencyKey: crypto.randomUUID(),
         description: 'System-initiated forced withdrawal'
       });
       setWithdrawMessage({ type: 'success', text: `Successfully withdrew ₹${withdrawAmount}.` });
