@@ -207,9 +207,16 @@ export default function UserDashboard() {
     e.preventDefault();
     setTxMessage(null);
 
-    if (!toAccount || !amount || parseFloat(amount) <= 0 || !description.trim() || !txMpin || txMpin.length !== 4) {
-      setTxMessage({ type: 'error', text: 'Please provide valid account ID, positive amount, description, and 4-digit MPIN.' });
-      return;
+    if (isSystemUser) {
+      if (!toAccount || !amount || parseFloat(amount) <= 0 || !description.trim()) {
+        setTxMessage({ type: 'error', text: 'Please provide valid account ID, positive amount, and description.' });
+        return;
+      }
+    } else {
+      if (!toAccount || !amount || parseFloat(amount) <= 0 || !description.trim() || !txMpin || txMpin.length !== 4) {
+        setTxMessage({ type: 'error', text: 'Please provide valid account ID, positive amount, description, and 4-digit MPIN.' });
+        return;
+      }
     }
 
     setTxLoading(true);
