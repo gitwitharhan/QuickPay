@@ -20,6 +20,48 @@
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
   }
+
+  @keyframes typing {
+    from { width: 0 }
+    to { width: 100% }
+  }
+
+  @keyframes blink {
+    50% { opacity: 0 }
+  }
+
+  @keyframes glitch {
+    0% { transform: translate(0) }
+    20% { transform: translate(-2px, 2px) }
+    40% { transform: translate(-2px, -2px) }
+    60% { transform: translate(2px, 2px) }
+    80% { transform: translate(2px, -2px) }
+    100% { transform: translate(0) }
+  }
+
+  @keyframes scanline {
+    0% { transform: translateY(-100%) }
+    100% { transform: translateY(100%) }
+  }
+}
+
+.typewriter {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  animation: typing 0.5s steps(30, end) forwards;
+}
+
+@keyframes log-scroll {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(-50%); }
+}
+
+.terminal-cursor::after {
+  content: '_';
+  animation: blink 0.8s step-end infinite;
+  margin-left: 2px;
+  color: #10b981;
 }
 
 

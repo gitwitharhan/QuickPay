@@ -12,6 +12,19 @@ export default function UserDashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
+  const mockLogs = React.useMemo(() => [
+    { id: 1, type: 'SYNC', node: 'X92', hex: '0xAFB12C' },
+    { id: 2, type: 'AUTH', node: 'P2P', hex: '0xCE429B' },
+    { id: 3, type: 'HASH', node: 'CH1', hex: '0x992BAD' },
+    { id: 4, type: 'PUSH', node: 'BK7', hex: '0x112C41' },
+    { id: 5, type: 'PULL', node: 'NW4', hex: '0x8892EF' },
+    { id: 6, type: 'SYNC', node: 'QA1', hex: '0xBB2311' },
+    { id: 7, type: 'AUTH', node: 'Z99', hex: '0xCC4452' },
+    { id: 8, type: 'HASH', node: 'LV3', hex: '0xAA1239' },
+    { id: 9, type: 'PUSH', node: 'MN0', hex: '0xDD4412' },
+    { id: 10, type: 'PULL', node: 'TY5', hex: '0xEE5561' },
+  ], []);
+
   const [accounts, setAccounts] = useState([]);
   const [selectedAccount, setSelectedAccount] = useState(null);
   const [balance, setBalance] = useState(null);
@@ -46,6 +59,7 @@ export default function UserDashboard() {
   const [reviewAmounts, setReviewAmounts] = useState({});
   const [reviewLoading, setReviewLoading] = useState({});
   const [directoryAccounts, setDirectoryAccounts] = useState([]);
+  const [loadingStep, setLoadingStep] = useState(0);
 
   const toggleReveal = (e, accId) => {
     e.stopPropagation();
@@ -90,6 +104,19 @@ export default function UserDashboard() {
       loadRequests();
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    let interval;
+    if (txLoading || withdrawLoading) {
+      setLoadingStep(0);
+      interval = setInterval(() => {
+        setLoadingStep(prev => (prev < 5 ? prev + 1 : prev));
+      }, 700);
+    } else {
+      setLoadingStep(0);
+    }
+    return () => clearInterval(interval);
+  }, [txLoading, withdrawLoading]);
 
   const loadActivities = async () => {
     setLoadingActivities(true);
@@ -380,37 +407,82 @@ export default function UserDashboard() {
   return (
     <div className="min-h-screen bg-[#030303] text-white flex flex-col md:flex-row select-none overflow-hidden font-['Inter']">
       
-      {/* Loading Overlay - Terminal Style */}
+      {/* Loading Overlay - Terminal Style Overhaul V2.0 */}
       {(txLoading || withdrawLoading) && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#030303]/95 backdrop-blur-3xl transition-opacity animate-in fade-in duration-300">
-          <div className="w-[90%] max-w-md p-8 rounded-3xl border border-emerald-500/20 bg-black/60 shadow-[0_0_50px_rgba(16,185,129,0.05)] font-mono backdrop-blur-md relative overflow-hidden">
-            {/* Scanline effect */}
-            <div className="absolute inset-0 w-full h-full bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.25)_50%)] bg-[length:100%_4px] pointer-events-none opacity-50 z-10"></div>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#030303]/98 backdrop-blur-3xl transition-opacity animate-in fade-in duration-300">
+          <div className="w-[92%] max-w-lg p-10 rounded-[40px] border border-emerald-500/20 bg-emerald-950/10 shadow-[0_0_80px_rgba(16,185,129,0.1)] font-mono backdrop-blur-3xl relative overflow-hidden group">
+            {/* Gloss Texture */}
+            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.08] via-transparent to-transparent pointer-events-none"></div>
+            
+            {/* Vertical Scanline */}
+            <div className="absolute inset-0 w-full h-[150%] bg-gradient-to-b from-transparent via-emerald-500/5 to-transparent pointer-events-none z-10 animate-[scanline_6s_linear_infinite]"></div>
+            
+            {/* Scanline pattern effect */}
+            <div className="absolute inset-0 w-full h-full bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.3)_50%)] bg-[length:100%_4px] pointer-events-none opacity-40 z-10"></div>
             
             <div className="relative z-20">
-              <div className="flex items-center gap-2 mb-8 border-b border-emerald-500/20 pb-4">
-                 <div className="w-2.5 h-2.5 rounded-full bg-rose-500/60"></div>
-                 <div className="w-2.5 h-2.5 rounded-full bg-amber-500/60"></div>
-                 <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/60 shadow-[0_0_10px_#10b981]"></div>
-                 <span className="ml-4 text-[10px] text-emerald-500/50 uppercase tracking-[0.3em]">Sys_Terminal_v1.0</span>
+              <div className="flex items-center justify-between mb-10 border-b border-emerald-500/20 pb-6">
+                 <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-rose-500/60 shadow-[0_0_10px_rgba(244,63,94,0.3)]"></div>
+                    <div className="w-3 h-3 rounded-full bg-amber-500/60"></div>
+                    <div className="w-3 h-3 rounded-full bg-emerald-500/60 shadow-[0_0_15px_#10b981]"></div>
+                 </div>
+                 <span className="text-[10px] text-emerald-500/70 uppercase tracking-[0.4em] font-black">Secure_Core_v2.4.0</span>
               </div>
               
-              <div className="space-y-4 text-xs md:text-sm">
-                 <p className="text-emerald-400">$&gt; INITIALIZING_SECURE_NODE...</p>
-                 <p className="text-white/60 animate-in fade-in slide-in-from-bottom-2 duration-500 delay-150 fill-mode-both">$&gt; ESTABLISHING_HANDSHAKE [OK]</p>
-                 <p className="text-white/60 animate-in fade-in slide-in-from-bottom-2 duration-500 delay-300 fill-mode-both">$&gt; ENCRYPTING_PAYLOAD...</p>
+              <div className="space-y-5 text-xs md:text-[13px] min-h-[160px]">
+                 <div className={`text-emerald-400 flex items-center h-7 ${loadingStep >= 0 ? 'opacity-100' : 'opacity-0'}`}>
+                   <span className={loadingStep === 0 ? 'typewriter terminal-cursor' : (loadingStep > 0 ? 'opacity-100' : 'opacity-0')}>$&gt; INITIALIZING_SECURE_NODE... [OK]</span>
+                 </div>
+                 <div className={`text-white/70 flex items-center h-7 ${loadingStep >= 1 ? 'opacity-100' : 'opacity-0'}`}>
+                   <span className={loadingStep === 1 ? 'typewriter terminal-cursor' : (loadingStep > 1 ? 'opacity-100' : 'opacity-0')}>$&gt; ESTABLISHING_ENCRYPTED_HANDSHAKE...</span>
+                 </div>
+                 <div className={`text-white/70 flex items-center h-7 ${loadingStep >= 2 ? 'opacity-100' : 'opacity-0'}`}>
+                   <span className={loadingStep === 2 ? 'typewriter terminal-cursor' : (loadingStep > 2 ? 'opacity-100' : 'opacity-0')}>$&gt; QUANTUM_SHIELD_ACTIVE [PROTECTED]</span>
+                 </div>
+                 <div className={`text-white/70 flex items-center h-7 ${loadingStep >= 3 ? 'opacity-100' : 'opacity-0'}`}>
+                   <span className={loadingStep === 3 ? 'typewriter terminal-cursor' : (loadingStep > 3 ? 'opacity-100' : 'opacity-0')}>$&gt; VERIFYING_TRANSACTION_HASH_SET...</span>
+                 </div>
+                 <div className={`text-white/70 flex items-center h-7 ${loadingStep >= 4 ? 'opacity-100' : 'opacity-0'}`}>
+                   <span className={loadingStep === 4 ? 'typewriter terminal-cursor' : (loadingStep > 4 ? 'opacity-100' : 'opacity-0')}>$&gt; COMMITTING_BLOCK_TO_LEDGER_CHAIN...</span>
+                 </div>
                  
-                 <div className="flex items-center gap-3 pt-6 border-t border-white/5 mt-6 border-dashed">
-                   <div className="animate-spin w-4 h-4 border-2 border-emerald-500/30 border-t-emerald-400 rounded-full"></div>
-                   <span className="text-emerald-400 font-bold tracking-widest uppercase text-sm">
-                     {txLoading ? 'EXECUTING_TRANSFER' : 'FORCING_WITHDRAWAL'}
+                 <div className={`flex items-center gap-4 pt-8 border-t border-white/5 mt-8 border-dashed transition-all duration-700 ${loadingStep >= 5 ? 'opacity-100 animate-[glitch_0.4s_ease-in-out]' : 'opacity-20 translate-y-2'}`}>
+                   <div className="animate-spin w-5 h-5 border-2 border-emerald-500/20 border-t-emerald-400 rounded-full shadow-[0_0_15px_rgba(16,185,129,0.2)]"></div>
+                   <span className="text-emerald-400 font-black tracking-[0.2em] uppercase text-sm md:text-base italic">
+                     {txLoading ? 'EXECUTING_CORE_TRANSFER' : 'FORCING_SYSTEM_WITHDRAWAL'}
                    </span>
-                   <span className="w-1.5 h-4 bg-emerald-400 animate-pulse ml-0.5" style={{ animationDuration: '0.8s' }}></span>
+                   <span className="w-2 h-5 bg-emerald-400 animate-pulse ml-0.5 shadow-[0_0_10px_#10b981]"></span>
+                 </div>
+
+                 {/* Scrolling Execution Log - Stabilized Premium */}
+                 <div className={`mt-8 p-5 bg-black/60 rounded-[32px] border border-white/5 h-32 overflow-hidden relative transition-all duration-1000 ${loadingStep > 0 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/90 z-10 pointer-events-none"></div>
+                    <div 
+                      className="space-y-2.5 font-mono text-[9px] md:text-[10px] text-emerald-500/10 font-bold"
+                      style={{ animation: 'log-scroll 15s linear infinite' }}
+                    >
+                       {[...mockLogs, ...mockLogs].map((log, i) => (
+                         <div key={`${log.id}-${i}`} className="flex justify-between items-center bg-emerald-500/[0.02] px-3 py-1.5 rounded-xl border border-emerald-500/5">
+                           <span className="flex items-center gap-2">
+                              <span className="text-[8px] opacity-30">[{String(log.id).padStart(4, '0')}]</span>
+                              {log.type}_NODE_{log.node}
+                           </span>
+                           <span className="opacity-40 font-mono tracking-tighter">{log.hex}</span>
+                         </div>
+                       ))}
+                    </div>
                  </div>
               </div>
               
-              <div className="mt-8 w-full h-1 bg-white/5 rounded-full overflow-hidden">
-                 <div className="h-full bg-emerald-500 animate-[pulse_1.5s_ease-in-out_infinite]" style={{ width: '75%', boxShadow: '0 0 10px #10b981' }}></div>
+              <div className="mt-10 w-full h-1.5 bg-white/5 rounded-full overflow-hidden relative">
+                 <div 
+                   className="h-full bg-emerald-500 transition-all duration-1000 ease-out shadow-[0_0_20px_#10b981] relative z-20" 
+                   style={{ width: `${(loadingStep / 5) * 100}%` }}
+                 >
+                    {/* Progress Spark */}
+                    <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-full bg-white opacity-50 blur-sm"></div>
+                 </div>
               </div>
             </div>
           </div>
