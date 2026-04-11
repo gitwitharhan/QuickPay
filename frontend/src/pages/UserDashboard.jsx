@@ -60,6 +60,8 @@ export default function UserDashboard() {
   const [reviewLoading, setReviewLoading] = useState({});
   const [directoryAccounts, setDirectoryAccounts] = useState([]);
   const [loadingStep, setLoadingStep] = useState(0);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [lastTxData, setLastTxData] = useState(null);
 
   const toggleReveal = (e, accId) => {
     e.stopPropagation();
@@ -261,21 +263,21 @@ export default function UserDashboard() {
     const idempotencyKey = crypto.randomUUID();
 
     try {
+      let res;
       if (isSystemUser) {
-        await createInitialTransaction({
+        res = await createInitialTransaction({
           toAccount,
           amount: parseFloat(amount),
           idempotencyKey,
           description: description.trim()
         });
-        setTxMessage({ type: 'success', text: 'Initial transaction sent successfully!' });
       } else {
         if (!selectedAccount) {
           setTxMessage({ type: 'error', text: 'No selected account to send from.' });
           setTxLoading(false);
           return;
         }
-        await createTransaction({
+        res = await createTransaction({
           fromAccount: selectedAccount._id,
           toAccount,
           amount: parseFloat(amount),
@@ -283,16 +285,23 @@ export default function UserDashboard() {
           description: description.trim(),
           mpin: txMpin
         });
-        setTxMessage({ type: 'success', text: 'Transaction sent successfully!' });
-
-        const details = await fetchAccountDetails(selectedAccount._id);
-        setBalance(details.balance);
       }
 
-      setToAccount('');
-      setAmount('');
-      setDescription('');
-      setTxMpin('');
+      if (res.status === 201) {
+        setTxMessage({ type: 'success', text: 'Transaction completed successfully' });
+        setLastTxData({
+          amount,
+          to: toAccount,
+          id: res.data.transaction?._id || 'N/A'
+        });
+        setShowSuccessModal(true);
+        setAmount('');
+        setToAccount('');
+        setDescription('');
+        setTxMpin('');
+        loadAccounts();
+        loadActivities();
+      }
     } catch (err) {
       if (!handleApiError(err)) {
         setTxMessage({ type: 'error', text: err.message || 'Transaction failed.' });
@@ -311,13 +320,19 @@ export default function UserDashboard() {
     setWithdrawLoading(true);
     setWithdrawMessage({ type: '', text: '' });
     try {
-      await systemWithdrawal({
+      const res = await systemWithdrawal({
         fromAccount: accountId,
         amount: parseFloat(withdrawAmount),
         idempotencyKey: crypto.randomUUID(),
         description: 'System-initiated forced withdrawal'
       });
       setWithdrawMessage({ type: 'success', text: `Successfully withdrew ₹${withdrawAmount}.` });
+      setLastTxData({
+        amount: withdrawAmount,
+        to: 'System Reserves',
+        id: res.data.transaction?._id || 'N/A'
+      });
+      setShowSuccessModal(true);
       await loadAccounts(); 
       setWithdrawAmount('');
       setTimeout(() => setWithdrawTarget(null), 2000); 
@@ -406,88 +421,66 @@ export default function UserDashboard() {
 
   return (
     <div className="min-h-screen bg-[#030303] text-white flex flex-col md:flex-row select-none overflow-hidden font-['Inter']">
-      
-      {/* Loading Overlay - Terminal Style Overhaul V2.0 */}
-      {(txLoading || withdrawLoading) && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#030303]/98 backdrop-blur-3xl transition-opacity animate-in fade-in duration-300">
-          <div className="w-[92%] max-w-lg p-10 rounded-[40px] border border-emerald-500/20 bg-emerald-950/10 shadow-[0_0_80px_rgba(16,185,129,0.1)] font-mono backdrop-blur-3xl relative overflow-hidden group">
-            {/* Gloss Texture */}
-            <div className="absolute inset-0 bg-gradient-to-br from-white/[0.08] via-transparent to-transparent pointer-events-none"></div>
-            
-            {/* Vertical Scanline */}
-            <div className="absolute inset-0 w-full h-[150%] bg-gradient-to-b from-transparent via-emerald-500/5 to-transparent pointer-events-none z-10 animate-[scanline_6s_linear_infinite]"></div>
-            
-            {/* Scanline pattern effect */}
-            <div className="absolute inset-0 w-full h-full bg-[linear-gradient(transparent_50%,rgba(0,0,0,0.3)_50%)] bg-[length:100%_4px] pointer-events-none opacity-40 z-10"></div>
-            
-            <div className="relative z-20">
-              <div className="flex items-center justify-between mb-10 border-b border-emerald-500/20 pb-6">
-                 <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 rounded-full bg-rose-500/60 shadow-[0_0_10px_rgba(244,63,94,0.3)]"></div>
-                    <div className="w-3 h-3 rounded-full bg-amber-500/60"></div>
-                    <div className="w-3 h-3 rounded-full bg-emerald-500/60 shadow-[0_0_15px_#10b981]"></div>
-                 </div>
-                 <span className="text-[10px] text-emerald-500/70 uppercase tracking-[0.4em] font-black">Secure_Core_v2.4.0</span>
-              </div>
-              
-              <div className="space-y-5 text-xs md:text-[13px] min-h-[160px]">
-                 <div className={`text-emerald-400 flex items-center h-7 ${loadingStep >= 0 ? 'opacity-100' : 'opacity-0'}`}>
-                   <span className={loadingStep === 0 ? 'typewriter terminal-cursor' : (loadingStep > 0 ? 'opacity-100' : 'opacity-0')}>$&gt; INITIALIZING_SECURE_NODE... [OK]</span>
-                 </div>
-                 <div className={`text-white/70 flex items-center h-7 ${loadingStep >= 1 ? 'opacity-100' : 'opacity-0'}`}>
-                   <span className={loadingStep === 1 ? 'typewriter terminal-cursor' : (loadingStep > 1 ? 'opacity-100' : 'opacity-0')}>$&gt; ESTABLISHING_ENCRYPTED_HANDSHAKE...</span>
-                 </div>
-                 <div className={`text-white/70 flex items-center h-7 ${loadingStep >= 2 ? 'opacity-100' : 'opacity-0'}`}>
-                   <span className={loadingStep === 2 ? 'typewriter terminal-cursor' : (loadingStep > 2 ? 'opacity-100' : 'opacity-0')}>$&gt; QUANTUM_SHIELD_ACTIVE [PROTECTED]</span>
-                 </div>
-                 <div className={`text-white/70 flex items-center h-7 ${loadingStep >= 3 ? 'opacity-100' : 'opacity-0'}`}>
-                   <span className={loadingStep === 3 ? 'typewriter terminal-cursor' : (loadingStep > 3 ? 'opacity-100' : 'opacity-0')}>$&gt; VERIFYING_TRANSACTION_HASH_SET...</span>
-                 </div>
-                 <div className={`text-white/70 flex items-center h-7 ${loadingStep >= 4 ? 'opacity-100' : 'opacity-0'}`}>
-                   <span className={loadingStep === 4 ? 'typewriter terminal-cursor' : (loadingStep > 4 ? 'opacity-100' : 'opacity-0')}>$&gt; COMMITTING_BLOCK_TO_LEDGER_CHAIN...</span>
-                 </div>
-                 
-                 <div className={`flex items-center gap-4 pt-8 border-t border-white/5 mt-8 border-dashed transition-all duration-700 ${loadingStep >= 5 ? 'opacity-100 animate-[glitch_0.4s_ease-in-out]' : 'opacity-20 translate-y-2'}`}>
-                   <div className="animate-spin w-5 h-5 border-2 border-emerald-500/20 border-t-emerald-400 rounded-full shadow-[0_0_15px_rgba(16,185,129,0.2)]"></div>
-                   <span className="text-emerald-400 font-black tracking-[0.2em] uppercase text-sm md:text-base italic">
-                     {txLoading ? 'EXECUTING_CORE_TRANSFER' : 'FORCING_SYSTEM_WITHDRAWAL'}
-                   </span>
-                   <span className="w-2 h-5 bg-emerald-400 animate-pulse ml-0.5 shadow-[0_0_10px_#10b981]"></span>
-                 </div>
 
-                 {/* Scrolling Execution Log - Stabilized Premium */}
-                 <div className={`mt-8 p-5 bg-black/60 rounded-[32px] border border-white/5 h-32 overflow-hidden relative transition-all duration-1000 ${loadingStep > 0 ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/90 z-10 pointer-events-none"></div>
-                    <div 
-                      className="space-y-2.5 font-mono text-[9px] md:text-[10px] text-emerald-500/10 font-bold"
-                      style={{ animation: 'log-scroll 15s linear infinite' }}
-                    >
-                       {[...mockLogs, ...mockLogs].map((log, i) => (
-                         <div key={`${log.id}-${i}`} className="flex justify-between items-center bg-emerald-500/[0.02] px-3 py-1.5 rounded-xl border border-emerald-500/5">
-                           <span className="flex items-center gap-2">
-                              <span className="text-[8px] opacity-30">[{String(log.id).padStart(4, '0')}]</span>
-                              {log.type}_NODE_{log.node}
-                           </span>
-                           <span className="opacity-40 font-mono tracking-tighter">{log.hex}</span>
-                         </div>
-                       ))}
-                    </div>
-                 </div>
-              </div>
-              
-              <div className="mt-10 w-full h-1.5 bg-white/5 rounded-full overflow-hidden relative">
-                 <div 
-                   className="h-full bg-emerald-500 transition-all duration-1000 ease-out shadow-[0_0_20px_#10b981] relative z-20" 
-                   style={{ width: `${(loadingStep / 5) * 100}%` }}
-                 >
-                    {/* Progress Spark */}
-                    <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-full bg-white opacity-50 blur-sm"></div>
-                 </div>
-              </div>
-            </div>
-          </div>
+
+      {/* Linear Top Progress Bar */}
+      {(txLoading || withdrawLoading) && (
+        <div className="fixed top-0 left-0 right-0 h-1 z-[150] bg-white/5 backdrop-blur-md">
+           <div 
+             className="h-full bg-emerald-500 shadow-[0_0_20px_#10b981] transition-all duration-700 ease-out relative" 
+             style={{ width: `${(loadingStep / 5) * 100}%` }}
+           >
+              <div className="absolute right-0 top-0 bottom-0 w-12 bg-white/40 blur-lg"></div>
+           </div>
         </div>
       )}
+
+      {/* Success Modal Popup */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-[#030303]/80 backdrop-blur-2xl animate-in fade-in duration-500">
+           <div className="w-full max-w-sm bg-gradient-to-br from-emerald-950/20 to-black/80 rounded-[40px] border border-emerald-500/20 p-10 shadow-[0_0_100px_rgba(16,185,129,0.1)] relative overflow-hidden animate-in zoom-in-95 duration-300">
+              <div className="absolute top-0 right-0 p-8">
+                 <button onClick={() => setShowSuccessModal(false)} className="text-white/20 hover:text-white transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                 </button>
+              </div>
+
+              <div className="flex flex-col items-center text-center">
+                 <div className="w-20 h-20 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mb-8 relative">
+                    <div className="absolute inset-0 rounded-full border-2 border-emerald-500 animate-ping opacity-20"></div>
+                    <svg className="text-emerald-500" xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                 </div>
+
+                 <h3 className="font-['Syne'] font-black text-3xl text-white mb-2">Success!</h3>
+                 <p className="text-white/40 text-sm mb-10">Transaction has been confirmed by the node.</p>
+
+                 <div className="w-full space-y-4 mb-10 text-left bg-white/[0.02] p-6 rounded-3xl border border-white/5">
+                    <div className="flex justify-between">
+                       <span className="text-white/20 text-[10px] uppercase font-bold tracking-widest">Amount</span>
+                       <span className="text-emerald-400 font-bold">₹{lastTxData?.amount}</span>
+                    </div>
+                    <div className="flex justify-between">
+                       <span className="text-white/20 text-[10px] uppercase font-bold tracking-widest">Recipient</span>
+                       <span className="text-white/80 font-mono text-xs">{lastTxData?.to?.slice(0, 12)}...</span>
+                    </div>
+                    <div className="flex justify-between pt-4 border-t border-white/5">
+                       <span className="text-white/20 text-[10px] uppercase font-bold tracking-widest">Status</span>
+                       <span className="text-emerald-500 font-bold text-[10px] uppercase">Finalized</span>
+                    </div>
+                 </div>
+
+                 <button 
+                   onClick={() => setShowSuccessModal(false)}
+                   className="w-full py-5 rounded-2xl bg-emerald-500 text-black font-black uppercase tracking-[0.2em] text-xs hover:bg-emerald-400 shadow-[0_20px_40px_-10px_rgba(16,185,129,0.3)] transition-all active:scale-[0.98]"
+                 >
+                   Return to Hub
+                 </button>
+              </div>
+           </div>
+        </div>
+      )}
+
+
 
       {/* Mobile Top Header */}
       <div className="md:hidden flex items-center justify-between p-6 border-b border-white/5 bg-[#030303]/80 backdrop-blur-3xl z-20">
