@@ -19,8 +19,10 @@ export const createTransaction = async (req: any, res: any) => {
       return res.status(400).json({ message: "Missing required fields, including MPIN" });
     }   
 
-    const fromAcc = await Account.findById(fromAccount);
-    const toAcc = await Account.findById(toAccount);
+    const [fromAcc, toAcc] = await Promise.all([
+      Account.findById(fromAccount),
+      Account.findById(toAccount)
+    ]);
 
     if (!fromAcc || !toAcc) {
       return res.status(404).json({ message: "One or both accounts not found" });
@@ -99,8 +101,6 @@ export const createTransaction = async (req: any, res: any) => {
         { session }
       );
 
-      await (()=> new Promise(resolve => setTimeout(resolve, 1000)))(); // Simulate processing delay  
-
       // @ts-ignore
       const creditLedgerEntry = await Ledger.create([ 
         {
@@ -119,12 +119,14 @@ export const createTransaction = async (req: any, res: any) => {
       ) as ITransaction;
     });
     try {
-      const senderUser = await User.findById(fromAcc.user);
-      const receiverUser = await User.findById(toAcc.user);
+      const [senderUser, receiverUser] = await Promise.all([
+        User.findById(fromAcc.user),
+        User.findById(toAcc.user)
+      ]);
       const amountStr = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
 
       if (receiverUser?.email) {
-        await sendEmail({
+        sendEmail({
           to: receiverUser.email,
           subject: "Amount Credited - QuickPay",
           html: `<div style="font-family: Arial, sans-serif; padding: 20px; color: #333; border: 1px solid #ddd; border-radius: 5px;">
@@ -138,11 +140,11 @@ export const createTransaction = async (req: any, res: any) => {
                    <br/>
                    <p>Thank you for using QuickPay.</p>
                  </div>`,
-        });
+        }).catch(err => console.error("Async email error (receiver):", err));
       }
 
       if (senderUser?.email) {
-        await sendEmail({
+        sendEmail({
           to: senderUser.email,
           subject: "Amount Debited - QuickPay",
           html: `<div style="font-family: Arial, sans-serif; padding: 20px; color: #333; border: 1px solid #ddd; border-radius: 5px;">
@@ -154,7 +156,7 @@ export const createTransaction = async (req: any, res: any) => {
                    <br/>
                    <p>Thank you for using QuickPay.</p>
                  </div>`,
-        });
+        }).catch(err => console.error("Async email error (sender):", err));
       }
     } catch (emailError) {
       console.error("Failed to send transaction notification emails:", emailError);
